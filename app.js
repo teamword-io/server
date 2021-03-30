@@ -22,8 +22,8 @@ const io = require('socket.io')(server);
 
 import Room from './src/Room';
 import User from './src/User';
-import config from './src/config'
-
+import config from './src/config';
+import StringSimilarity from './src/StringSimilarity';
 /**
  * Constants
  */
@@ -189,11 +189,20 @@ io.on('connection', (socket) => {
                             );
                         }
                     } else {
-                        // chat is outside round, eg. in pause between rounds
+                        // user tries guessing
                         room.broadcastChatMsg({ ...msg, username: user.username });
+
+                        let similarity = StringSimilarity(round.word, msg.msg);
+                        if(similarity >= 0.85) {
+                            user.socket.emit('chatMsg', {
+                                type: 'near',
+                                systemMsg: `game.wasNear`,
+                            });
+                        }
                     }
                 }
             } else {
+                // chat is outside round, eg. in pause between rounds
                 room.broadcastChatMsg({ ...msg, username: user.username });
             }
         }
