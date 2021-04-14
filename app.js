@@ -43,13 +43,26 @@ io.on('connection', (socket) => {
     // give each socket a random identifier so that we can determine who is who when
     // we're sending messages back and forth!
     // socket.id = nanoid();
-    socket.on('gameStart', (settings) => {
+    socket.on('gameStart', (settings, callbackFn) => {
         const room = rooms[socket.roomId];
         if(room) {
             room.setSettings( settings );
-            room.createTeams();
-            room.broadcast('addTeams', room.getTeamsState());
-            room.startGame();
+
+            if(room.teamsAreValid()) {
+                room.broadcast('addTeams', room.getTeamsState());
+                room.startGame();
+            } else {
+                room.broadcast('teamError',1);
+            }
+
+            // room.createTeams( true );
+            // room.broadcast('addTeams', room.getTeamsState());
+            // room.startGame();
+
+            callbackFn({
+                valid: room.teamsAreValid()
+            });
+
         }
     });
 
@@ -60,13 +73,16 @@ io.on('connection', (socket) => {
         const room = new Room();
         room.settings = data.settings;
         rooms[room.id] = room;
-        const user = new User(socket.id, socket, data.username, true, data.avatar);
+        const user = new User(socket.id, socket, data.username, true, data.avatar, 1);
         room.addUser(user);
         socket.emit('usersState', room.getUsersState());
+
+        room.createTeams( false );
+        room.broadcast('addTeams', room.getTeamsState());
+
         callbackFn({
             roomID: room.id
         });
-
     });
 
     /**
@@ -75,10 +91,13 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', (data, callbackFn) => {
         const room = rooms[data.roomID];
         if(room && room.users.length < config.MAX_PLAYERS_PER_ROOM && !room.gameStarted ) {
-            const user = new User(socket.id, socket, data.username, false, data.avatar);
+            const user = new User(socket.id, socket, data.username, false, data.avatar, 1);
             room.addUser(user);
 
             socket.emit('usersState', room.getUsersState());
+
+            room.createTeams( false );
+            room.broadcast('addTeams', room.getTeamsState());
 
             callbackFn({
                 roomID: data.roomID,
@@ -88,6 +107,21 @@ io.on('connection', (socket) => {
             callbackFn({
                 roomID: false
             });
+        }
+    });
+
+    socket.on('tryStart', (msg) => {
+
+    });
+
+    socket.on('changeTeam', (fromTeam, teamNo) => {
+        if(socket.roomId) {
+            const room = rooms[socket.roomId];
+            const user = room.getCurrentUser(socket);
+            if(room) {
+                room.toTeam(user, fromTeam, teamNo);
+                room.broadcast('addTeams', room.getTeamsState());
+            }
         }
     });
 
@@ -222,9 +256,11 @@ io.on('connection', (socket) => {
                         room.exitGame();
                     } else {
                         room.removeUser(user);
+                        room.broadcast('addTeams', room.getTeamsState());
                         room.endGame();
                     }
                 } else {
+                    room.broadcast('addTeams', room.getTeamsState());
                     room.endGame();
                 }
 

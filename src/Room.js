@@ -66,6 +66,7 @@ export default class Room {
 
             // remove from list
             this.users = this.users.filter((usr) => usr.id !== user.id);
+            this.createTeams(false);
 
             // tell others
             this.broadcastChatMsg({
@@ -138,14 +139,25 @@ export default class Room {
     /**
      * Returns an array with random users in team chunks (min 2, max 3)
      */
-    createTeams() {
+    createTeams( doShuffle=true ) {
         let shuffeld = [...this.users];
-        for (let i = shuffeld.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffeld[i], shuffeld[j]] = [shuffeld[j], shuffeld[i]];
+        if(doShuffle) {
+            for (let i = shuffeld.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffeld[i], shuffeld[j]] = [shuffeld[j], shuffeld[i]];
+            }
         }
         let teams = this.chunkArray(shuffeld,2);
         this.teams = teams;
+    }
+
+    toTeam( user, fromTeam, toTeam) {
+        this.teams[toTeam].push(user);
+        this.teams[fromTeam].forEach( (teamuser, idx) => {
+            if(user.id === teamuser.id) {
+                this.teams[fromTeam].splice(idx,1);
+            }
+        });
     }
 
     getUsersState() {
@@ -155,6 +167,17 @@ export default class Room {
         return this.teams.map((team) => {
             return team.map((user) => user.describe());
         });
+    }
+
+    teamsAreValid() {
+        let valid = true;
+        this.teams.forEach((team) => {
+           if( team.length < 2) {
+               valid = false;
+           }
+        });
+
+        return valid;
     }
 
     broadcastChatMsg(msg, excludedUser ) {

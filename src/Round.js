@@ -25,10 +25,6 @@ class Round {
         return shuffeld.slice(0,3);
     }
 
-    pickRandomWord() {
-        return this.words[Math.floor(Math.random() * this.words.length)];
-    }
-
     determineHintCount() {
         const runeCount = this.word.length;
         if (runeCount <= 2) {
